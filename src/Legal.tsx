@@ -2,14 +2,14 @@ import { card } from './ui'
 
 // >>> HIER DEINE ANGABEN EINTRAGEN (alles in Anführungszeichen) <<<
 const C = {
-  inhaber: '[Vor- und Nachname der Inhaberin]',
-  firma: 'SO Femme Events',
-  anschrift: '[Straße Hausnummer, PLZ Ort, Österreich]',
+  inhaber: 'Sophie Salchinger-Koch, BA',
+  firma: 'SO FEMME EVENTS',
+  anschrift: 'Benedikt-Schellinger-Gasse 20, Top 15, 1150 Wien, Österreich',
   email: 'sofemme.events@outlook.at',
   telefon: '+43 664 88615079',
-  uid: '[UID-Nummer, falls vorhanden – sonst Zeile entfernen]',
-  gewerbe: '[z. B. Eventmarketing / Gewerbe laut Gewerbeschein]',
-  behoerde: '[zuständige Bezirkshauptmannschaft / Magistrat]',
+  gewerbe: 'Organisation von Veranstaltungen, Märkten und Messen (Eventmanagement)',
+  behoerde: 'Magistratisches Bezirksamt für den 15. Bezirk, Wien',
+  steuernummer: '67 392/7679',
 }
 
 const H = ({ children }: { children: string }) => <h2 className="mt-8 text-3xl">{children}</h2>
@@ -27,11 +27,13 @@ function Shell({ title, onBack, children }: { title: string; onBack: () => void;
 export function Imprint({ onBack }: { onBack: () => void }) {
   return (
     <Shell title="Impressum" onBack={onBack}>
+      <p className="text-sm">Informationspflicht laut §5 E-Commerce-Gesetz, §63 Gewerbeordnung und §14 Unternehmensgesetzbuch sowie Offenlegungspflicht laut §25 Mediengesetz.</p>
       <p><b>{C.firma}</b><br />{C.inhaber}<br />{C.anschrift}</p>
-      <p>E-Mail: {C.email}<br />Telefon: {C.telefon}</p>
-      <p>UID: {C.uid}</p>
+      <p>Tel.: {C.telefon}<br />E-Mail: {C.email}</p>
       <p>Unternehmensgegenstand: {C.gewerbe}</p>
-      <p>Gewerbebehörde: {C.behoerde}<br />Mitglied der Wirtschaftskammer Österreich. Es gelten die Vorschriften der Gewerbeordnung (www.ris.bka.gv.at).</p>
+      <p>Steuernummer: {C.steuernummer}</p>
+      <p>Mitgliedschaften: Mitglied der WKÖ, WK Wien</p>
+      <p>Aufsichtsbehörde/Gewerbebehörde: {C.behoerde}<br />Verleihungsstaat: Österreich</p>
       <p>Grundlegende Richtung: Information über und Organisation von Veranstaltungen für Frauen in der Südoststeiermark sowie Austausch der Community.</p>
     </Shell>
   )
