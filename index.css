@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@theme {
+  --color-blush: #F5D2D0;
+  --color-rose: #D98381;
+  --color-berry: #8E3B46;
+  --font-sans: 'Archivo Variable', system-ui, sans-serif;
+}
+
+body { background: var(--color-blush); color: var(--color-berry); font-family: var(--font-sans); }
+h1, h2, h3 { font-stretch: 75%; font-weight: 800; letter-spacing: -0.03em; line-height: 0.95; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--color-berry); outline-offset: 2px; }
