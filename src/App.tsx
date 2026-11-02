@@ -151,9 +151,83 @@ function Events({ userId }: { userId: string }) {
   )
 }
 
+type FeedbackRow = { id: string; kind: 'idea' | 'feedback'; message: string; created_at: string; profiles?: { display_name: string } | null }
+
+function Ideas({ userId }: { userId: string }) {
+  const [kind, setKind] = useState<'idea' | 'feedback'>('idea')
+  const [message, setMessage] = useState('')
+  const [rows, setRows] = useState<FeedbackRow[]>([])
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function load() {
+    const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', userId).single()
+    setIsAdmin(!!me?.is_admin)
+    const { data } = await supabase
+      .from('feedback')
+      .select('id,kind,message,created_at,profiles(display_name)')
+      .order('created_at', { ascending: false })
+    setRows((data ?? []) as unknown as FeedbackRow[])
+  }
+  useEffect(() => { load() }, [])
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true); setMsg('')
+    const { error } = await supabase.from('feedback').insert({ user_id: userId, kind, message: message.trim() })
+    if (error) setMsg('Das hat leider nicht geklappt. Bitte versuche es nochmal.')
+    else { setMsg('Danke! Deine Nachricht ist bei SO Femme angekommen.'); setMessage(''); await load() }
+    setBusy(false)
+  }
+
+  const label = (k: string) => (k === 'idea' ? 'Eventidee' : 'Feedback')
+
+  return (
+    <main className="mx-auto max-w-2xl px-5 py-8">
+      <h1 className="text-6xl">Deine Stimme zählt.</h1>
+      <p className="mt-4 text-lg">Welches Event wünschst du dir? Was können wir besser machen?</p>
+      <form onSubmit={submit} className="mt-8 space-y-4 rounded-2xl bg-white p-6">
+        <div className="flex gap-3">
+          {(['idea', 'feedback'] as const).map(k => (
+            <button type="button" key={k} onClick={() => setKind(k)}
+              className={'rounded-full border-2 border-berry px-5 py-2 font-bold ' + (kind === k ? 'bg-berry text-blush' : 'text-berry')}>
+              {label(k)}
+            </button>
+          ))}
+        </div>
+        <textarea className={field + ' min-h-32'} maxLength={1000} required minLength={3}
+          placeholder={kind === 'idea' ? 'Zum Beispiel: ein Töpferabend oder Brunch mit Vortrag …' : 'Was hat dir gefallen? Was fehlt dir?'}
+          value={message} onChange={e => setMessage(e.target.value)} />
+        <button className={btn} disabled={busy || message.trim().length < 3}>Absenden</button>
+        {msg && <p role="status" className="text-sm font-bold">{msg}</p>}
+      </form>
+
+      {rows.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-4xl">{isAdmin ? 'Alle Nachrichten' : 'Deine Nachrichten'}</h2>
+          <div className="mt-5 space-y-4">
+            {rows.map(r => (
+              <article key={r.id} className="rounded-2xl bg-white p-5">
+                <p className="text-sm font-bold">
+                  {label(r.kind)}
+                  {isAdmin && r.profiles?.display_name ? ` von ${r.profiles.display_name}` : ''}
+                  {' – '}{new Date(r.created_at).toLocaleDateString('de-AT', { timeZone: 'Europe/Vienna' })}
+                </p>
+                <p className="mt-2 whitespace-pre-wrap">{r.message}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+    </main>
+  )
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
+  const [tab, setTab] = useState<'events' | 'ideas'>('events')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true) })
@@ -165,7 +239,17 @@ export default function App() {
   return (
     <>
       <Header onLogout={session ? () => supabase.auth.signOut() : undefined} />
-      {session ? <Events userId={session.user.id} /> : <Auth />}
+      {session && (
+        <nav className="mx-auto mt-4 flex max-w-2xl gap-3 px-5">
+          {([['events', 'Events'], ['ideas', 'Ideen & Feedback']] as const).map(([k, l]) => (
+            <button key={k} onClick={() => setTab(k)} aria-current={tab === k}
+              className={'rounded-full border-2 border-berry px-5 py-2 font-bold ' + (tab === k ? 'bg-berry text-blush' : 'text-berry')}>
+              {l}
+            </button>
+          ))}
+        </nav>
+      )}
+      {session ? (tab === 'events' ? <Events userId={session.user.id} /> : <Ideas userId={session.user.id} />) : <Auth />}
     </>
   )
 }
