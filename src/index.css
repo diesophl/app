@@ -1,11 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..900&display=swap');
 @import "tailwindcss";
 
 @theme {
   --color-blush: #F5D2D0;
   --color-rose: #D98381;
   --color-berry: #8E3B46;
-  --font-sans: 'Archivo', system-ui, sans-serif;
+  --font-sans: 'Archivo Variable', system-ui, sans-serif;
 }
 
 body { background: var(--color-blush); color: var(--color-berry); font-family: var(--font-sans); }

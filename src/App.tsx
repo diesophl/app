@@ -8,8 +8,11 @@ type EventRow = {
 }
 type Status = 'confirmed' | 'waitlist' | 'cancelled'
 
-const btn = 'rounded-full bg-berry px-6 py-3 font-bold text-blush disabled:opacity-50'
-const field = 'w-full rounded-xl border-2 border-rose bg-white px-4 py-3 text-berry'
+import { btn, field, pill } from './ui'
+import Profile from './Profile'
+import MyEvents from './MyEvents'
+import Admin from './Admin'
+import { Imprint, Privacy } from './Legal'
 
 function Header({ onLogout }: { onLogout?: () => void }) {
   return (
@@ -224,10 +227,14 @@ function Ideas({ userId }: { userId: string }) {
   )
 }
 
+type Page = 'events' | 'mine' | 'ideas' | 'profile' | 'admin' | 'privacy' | 'imprint'
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [ready, setReady] = useState(false)
-  const [tab, setTab] = useState<'events' | 'ideas'>('events')
+  const [page, setPage] = useState<Page>('events')
+  const [last, setLast] = useState<Page>('events')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true) })
@@ -235,21 +242,45 @@ export default function App() {
     return () => sub.subscription.unsubscribe()
   }, [])
 
+  const uid = session?.user.id
+  useEffect(() => {
+    if (!uid) { setIsAdmin(false); return }
+    supabase.from('profiles').select('is_admin').eq('id', uid).single().then(({ data }) => setIsAdmin(!!data?.is_admin))
+  }, [uid])
+
   if (!ready) return null
+
+  const tabs: [Page, string][] = [['events', 'Events'], ['mine', 'Meine Events'], ['ideas', 'Ideen & Feedback'], ['profile', 'Profil']]
+  if (isAdmin) tabs.push(['admin', 'Admin'])
+  const open = (p: Page) => { if (p !== 'privacy' && p !== 'imprint') setLast(p); setPage(p) }
+  const legal = page === 'privacy' || page === 'imprint'
+
+  let body
+  if (page === 'privacy') body = <Privacy onBack={() => setPage(last)} />
+  else if (page === 'imprint') body = <Imprint onBack={() => setPage(last)} />
+  else if (!uid) body = <Auth />
+  else if (page === 'mine') body = <MyEvents userId={uid} />
+  else if (page === 'ideas') body = <Ideas userId={uid} />
+  else if (page === 'profile') body = <Profile userId={uid} onDeleted={() => { setPage('events'); setLast('events') }} />
+  else if (page === 'admin' && isAdmin) body = <Admin />
+  else body = <Events userId={uid} />
+
   return (
     <>
       <Header onLogout={session ? () => supabase.auth.signOut() : undefined} />
-      {session && (
-        <nav className="mx-auto mt-4 flex max-w-2xl gap-3 px-5">
-          {([['events', 'Events'], ['ideas', 'Ideen & Feedback']] as const).map(([k, l]) => (
-            <button key={k} onClick={() => setTab(k)} aria-current={tab === k}
-              className={'rounded-full border-2 border-berry px-5 py-2 font-bold ' + (tab === k ? 'bg-berry text-blush' : 'text-berry')}>
-              {l}
-            </button>
+      {uid && !legal && (
+        <nav className="mx-auto mt-4 flex max-w-2xl flex-wrap gap-2 px-5">
+          {tabs.map(([k, l]) => (
+            <button key={k} onClick={() => open(k)} aria-current={page === k} className={pill(page === k)}>{l}</button>
           ))}
         </nav>
       )}
-      {session ? (tab === 'events' ? <Events userId={session.user.id} /> : <Ideas userId={session.user.id} />) : <Auth />}
+      {body}
+      <footer className="mx-auto max-w-2xl px-5 pb-10 pt-4 text-sm font-bold">
+        <button className="underline" onClick={() => setPage('privacy')}>Datenschutz</button>
+        <span className="mx-3">·</span>
+        <button className="underline" onClick={() => setPage('imprint')}>Impressum</button>
+      </footer>
     </>
   )
 }
