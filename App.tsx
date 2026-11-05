@@ -4,7 +4,7 @@ import { supabase } from './supabase'
 
 type EventRow = {
   id: string; title: string; description: string; starts_at: string
-  location: string; price_cents: number; capacity: number
+  location: string; price_cents: number; capacity: number; image_url: string | null
 }
 type Status = 'confirmed' | 'waitlist' | 'cancelled'
 
@@ -12,6 +12,8 @@ import { btn, field, pill } from './ui'
 import Profile from './Profile'
 import MyEvents from './MyEvents'
 import Admin from './Admin'
+import Ideas from './Ideas'
+import { downloadIcs } from './ics'
 import { Imprint, Privacy } from './Legal'
 
 function Header({ onLogout }: { onLogout?: () => void }) {
@@ -123,6 +125,7 @@ function Events({ userId }: { userId: string }) {
           const left = spots[e.id] ?? 0
           return (
             <article key={e.id} className="rounded-2xl bg-white p-6">
+              {e.image_url && <img src={e.image_url} alt="" className="mb-4 aspect-[4/3] w-full rounded-xl object-cover" />}
               <h2 className="text-4xl">{e.title}</h2>
               <p className="mt-3 font-bold">{fmt(e.starts_at)}</p>
               <p>{e.location} · {price(e.price_cents)}</p>
@@ -140,6 +143,7 @@ function Events({ userId }: { userId: string }) {
                     <span className="rounded-full bg-blush px-4 py-2 font-bold">
                       {s === 'confirmed' ? 'Du bist angemeldet ✓' : 'Du stehst auf der Warteliste'}
                     </span>
+                    {s === 'confirmed' && <button className="font-bold underline" onClick={() => downloadIcs(e)}>Im Kalender speichern</button>}
                     <button className="font-bold underline" disabled={busyId === e.id} onClick={() => act(e.id, 'cancel_registration')}>
                       Stornieren
                     </button>
@@ -154,76 +158,20 @@ function Events({ userId }: { userId: string }) {
   )
 }
 
-type FeedbackRow = { id: string; kind: 'idea' | 'feedback'; message: string; created_at: string; profiles?: { display_name: string } | null }
-
-function Ideas({ userId }: { userId: string }) {
-  const [kind, setKind] = useState<'idea' | 'feedback'>('idea')
-  const [message, setMessage] = useState('')
-  const [rows, setRows] = useState<FeedbackRow[]>([])
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [msg, setMsg] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function load() {
-    const { data: me } = await supabase.from('profiles').select('is_admin').eq('id', userId).single()
-    setIsAdmin(!!me?.is_admin)
-    const { data } = await supabase
-      .from('feedback')
-      .select('id,kind,message,created_at,profiles(display_name)')
-      .order('created_at', { ascending: false })
-    setRows((data ?? []) as unknown as FeedbackRow[])
-  }
-  useEffect(() => { load() }, [])
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true); setMsg('')
-    const { error } = await supabase.from('feedback').insert({ user_id: userId, kind, message: message.trim() })
-    if (error) setMsg('Das hat leider nicht geklappt. Bitte versuche es nochmal.')
-    else { setMsg('Danke! Deine Nachricht ist bei SO Femme angekommen.'); setMessage(''); await load() }
-    setBusy(false)
-  }
-
-  const label = (k: string) => (k === 'idea' ? 'Eventidee' : 'Feedback')
-
+function Banner() {
+  const [news, setNews] = useState<{ message: string; is_active: boolean } | null>(null)
+  const [hidden, setHidden] = useState(false)
+  useEffect(() => {
+    supabase.from('site_news').select('message,is_active').eq('id', 1).maybeSingle().then(({ data }) => setNews(data))
+  }, [])
+  if (!news || !news.is_active || !news.message || hidden) return null
   return (
-    <main className="mx-auto max-w-2xl px-5 py-8">
-      <h1 className="text-6xl">Deine Stimme zählt.</h1>
-      <p className="mt-4 text-lg">Welches Event wünschst du dir? Was können wir besser machen?</p>
-      <form onSubmit={submit} className="mt-8 space-y-4 rounded-2xl bg-white p-6">
-        <div className="flex gap-3">
-          {(['idea', 'feedback'] as const).map(k => (
-            <button type="button" key={k} onClick={() => setKind(k)}
-              className={'rounded-full border-2 border-berry px-5 py-2 font-bold ' + (kind === k ? 'bg-berry text-blush' : 'text-berry')}>
-              {label(k)}
-            </button>
-          ))}
-        </div>
-        <textarea className={field + ' min-h-32'} maxLength={1000} required minLength={3}
-          placeholder={kind === 'idea' ? 'Zum Beispiel: ein Töpferabend oder Brunch mit Vortrag …' : 'Was hat dir gefallen? Was fehlt dir?'}
-          value={message} onChange={e => setMessage(e.target.value)} />
-        <button className={btn} disabled={busy || message.trim().length < 3}>Absenden</button>
-        {msg && <p role="status" className="text-sm font-bold">{msg}</p>}
-      </form>
-
-      {rows.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-4xl">{isAdmin ? 'Alle Nachrichten' : 'Deine Nachrichten'}</h2>
-          <div className="mt-5 space-y-4">
-            {rows.map(r => (
-              <article key={r.id} className="rounded-2xl bg-white p-5">
-                <p className="text-sm font-bold">
-                  {label(r.kind)}
-                  {isAdmin && r.profiles?.display_name ? ` von ${r.profiles.display_name}` : ''}
-                  {' – '}{new Date(r.created_at).toLocaleDateString('de-AT', { timeZone: 'Europe/Vienna' })}
-                </p>
-                <p className="mt-2 whitespace-pre-wrap">{r.message}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-    </main>
+    <div className="mx-auto mt-4 max-w-2xl px-5">
+      <div role="status" className="flex items-start justify-between gap-4 rounded-2xl bg-berry px-5 py-4 text-blush">
+        <p className="font-bold">{news.message}</p>
+        <button onClick={() => setHidden(true)} aria-label="Schließen" className="text-xl font-bold leading-none">×</button>
+      </div>
+    </div>
   )
 }
 
@@ -275,6 +223,7 @@ export default function App() {
           ))}
         </nav>
       )}
+      {uid && !legal && <Banner />}
       {body}
       <footer className="mx-auto max-w-2xl px-5 pb-10 pt-4 text-sm font-bold">
         <button className="underline" onClick={() => setPage('privacy')}>Datenschutz</button>
